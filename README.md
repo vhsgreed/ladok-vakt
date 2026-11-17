@@ -1,12 +1,12 @@
 # ladok-vakt
 
 **Få mejl när Ladok-anmälan öppnar, innan fönstret stänger.**
-Kursregistrering och tentamensanmälan i Ladok, bevakade av ett litet skript som
-säger till en gång, på rätt dag, och håller tyst resten av tiden.
 
-`ladok-vakt` läser bara. Den anmäler aldrig något åt dig.
+`ladok-vakt` bevakar kursregistrering och tentamensanmälan i Ladok. Det läser
+bara — anmäler aldrig något åt dig — och säger till när det finns något du behöver
+veta. I normal drift är det tyst.
 
-```
+```text
 - Grundläggande farmakologi och omvårdnad (1SFOM2): anmälan 2026-11-23 till 2026-11-30 [om 7 d], kursstart 2026-11-30
 - Människan i hälsa och sjukdom del 1 (2SHS11): anmälan 2027-01-18 till 2027-01-25 [om 63 d], kursstart 2027-01-25
 ```
@@ -15,210 +15,221 @@ Engelska: [README.en.md](README.en.md).
 
 ---
 
-## Problemet
+## Varför ladok-vakt?
 
-Ladok påminner inte om att kursregistreringen öppnar. Fönstret är ofta en vecka,
-det står bara inne i studentwebb, och missar du det står du utan kursplats eller
-utan tentamensplats. Kalenderpåminnelser fungerar till dess att datumet flyttas
-eller tillfället läggs upp sent, vilket är precis när de inte gör det.
+Ladok påminner inte om att kursregistreringen öppnar. Fönstret är ofta bara en
+vecka, och informationen finns inne i studentwebben. Missar du det kan du stå utan
+kursplats eller tentamensplats. Kalenderpåminnelser hjälper bara så länge datumen
+inte flyttas eller tillfället läggs upp sent.
 
-`ladok-vakt` läser anmälningsfönstren ur Ladok och kan köras hur ofta du vill.
-Den är byggd för att köras av en cron en gång i dygnet och vara tyst.
-
-## Vad den gör
-
-- Hämtar dina kurstillfällen och deras **registreringsperiod** (anmälan öppnar, anmälan stänger), samt kursperiod.
-- Hämtar **tentamensanmälningar** där Ladok exponerar dem.
-- Skriver en rad per fönster som är öppet nu eller stänger inom N dagar.
-- Larmar **bara vid fel**: ingen lyckad hämtning på 36 h, tom kurslista, död session, trasigt svar.
-- Har en veckohälsokoll på måndagar så att tystnad går att skilja från tystnad.
-
-## Vad den inte gör
-
-- Anmäler, avanmäler eller ändrar ingenting. Bara GET.
-- Loggar inte in åt dig om du inte uttryckligen slår på det. Grundläget: du loggar in
-  en gång i en Chrome-profil och skriptet använder den sessionen. Valfri omloggning
-  finns, avstängd som standard, se [Valfri inloggning](#valfri-inloggning-av-som-standard).
-- Skickar ingen daglig sammanfattning. Tystnad är ett feature, inte en bugg.
+`ladok-vakt` hämtar anmälningsfönstren direkt från Ladok. Det är byggt för att
+köras automatiskt, exempelvis en gång om dagen via cron, och vara tyst när allt
+fungerar som det ska.
 
 ## Snabbstart
 
+### Förutsättningar
+
+- Python 3.8 eller senare
+- Chrome eller Chromium
+- Python-paketet `websockets`
+
+### Installera och prova
+
 ```bash
 git clone https://github.com/vhsgreed/ladok-vakt && cd ladok-vakt
-python3 -m pip install websockets          # enda beroendet utanför stdlib
+python3 -m pip install websockets
 
-# 1. En Chrome med eget profilnamn, där DU loggar in i Ladok en gång
+# Starta Chrome med en egen profil och logga in i Ladok där en gång
 flatpak run com.google.Chrome \
   --user-data-dir=$HOME/.config/ladok-vakt-chrome \
   --remote-debugging-port=9233
-#    (icke-flatpak: google-chrome ... samma flaggor)
+# Icke-Flatpak: google-chrome med samma flaggor
 
-# 2. Prova att läsa
+# Prova att läsa från Ladok
 python3 -m ladok_vakt --all
-
-# 3. Sätt notifieringen, se nedan, och lägg in den i cron
 ```
 
-`python3 -m ladok_vakt` utan argument är cron-läget: det skriver bara när det
-finns något att säga.
+Kör `python3 -m ladok_vakt` utan argument för cron-läget: det skriver bara när
+det finns något att säga. Ställ in en notifieringskanal nedan för att få larm.
 
-## Valfri inloggning (av som standard)
+## Vad den gör — och inte gör
 
-Sessionen i Ladok tar slut när webbläsaren startas om eller efter en tids
-inaktivitet. Med `LADOK_AUTOLOGIN=1` försöker skriptet logga in igen innan det larmar,
-med hjälp av det lösenord Chrome redan har sparat för ditt lärosätes inloggningssida.
+- Hämtar dina kurstillfällen, registreringsperioder och kursperioder.
+- Hämtar tentamensanmälningar där Ladok exponerar dem.
+- Skriver en rad per fönster som är öppet nu eller stänger inom det valda antalet dagar.
+- Larmar vid fel, till exempel om ingen hämtning lyckats på 36 timmar, kurslistan är tom, sessionen har dött eller svaret är trasigt.
+- Skickar en veckohälsokoll på måndagar, så att tystnad går att skilja från att skriptet slutat fungera.
+- Anmäler, avanmäler eller ändrar aldrig något. Skriptet läser bara från Ladok.
+- Skickar ingen daglig sammanfattning. Tystnad är ett feature, inte en bugg.
 
-```bash
-export LADOK_IDP_ENTITY='https://swamid2.shh.se/idp/shibboleth'   # ditt lärosätes SWAMID-id
-export LADOK_AUTOLOGIN=1
-python3 -m ladok_vakt --login      # prova en gång, i förväg
-```
+## Schemalägg körningen
 
-Vad den gör: öppnar inloggningen via SWAMID, väntar tills Chrome har fyllt i
-formuläret själv, klickar Login med ett riktigt musklick, och kontrollerar att Ladok
-svarar innan den rapporterar lyckat.
+### cron
 
-Vad den **inte** gör, och det här är värt att granska själv: den läser aldrig
-lösenordsfältets värde, sparar inget, skriver inget, skickar inget, och rör inte
-webbläsarens lösenordshanterar-API. Den frågar bara "är fälten ifyllda?" och klickar.
-Koden är `ladok_vakt/login.py`, och `tests/` har ett test som larmar om någon lägger in
-avläsning av fältvärden där.
-
-Förutsättningar: lösenordet är sparat i den Chrome-profil skriptet använder, och
-inloggningen kräver inget mer (2FA, engångskod eller godkännande i app). Gör den det
-misslyckas omloggningen och du får ett fellarm, vilket är meningen: den ska inte gissa.
-
-## Integrera i ditt flöde
-
-### 1. Schemaläggning
-
-**cron** (enkelt, kör 07:10 varje dag):
+Exempel: kör 07:10 varje dag.
 
 ```cron
 10 7 * * *  cd $HOME/src/ladok-vakt && LADOK_MAIL_TO=du@example.com /usr/bin/python3 -m ladok_vakt
 ```
 
-**systemd** (följer med i [`examples/`](examples/)):
+### systemd
+
+Exempelfiler finns i [`examples/`](examples/).
 
 ```bash
 cp examples/ladok-vakt.service examples/ladok-vakt.timer ~/.config/systemd/user/
 systemctl --user daemon-reload && systemctl --user enable --now ladok-vakt.timer
 ```
 
-**Hermes, Claude Code eller annan agent:** lägg raden i agentens cron, eller
+### Agent
+
+För Hermes, Claude Code eller annan agent: lägg körningen i agentens cron eller
 registrera [`skill/SKILL.md`](skill/SKILL.md) som en skill. Skriptet är gjort för
-att en agent ska kunna köra det utan att tolka fritext.
+att kunna köras utan att agenten behöver tolka fritext.
 
-### 2. Kanal: mejl via Resend
+## Välj notifieringskanal
 
-Snabbast väg till mejl utan SMTP-lösenord. Verifiera din domän i Resend, skapa
-en API-nyckel och:
+### Mejla via Resend
+
+Det snabbaste sättet att komma igång med mejl utan SMTP-lösenord. Verifiera din
+domän i Resend och skapa en API-nyckel:
 
 ```bash
 export LADOK_MAIL_TO=du@example.com
 export LADOK_MAIL_FROM='ladok-vakt <vakt@din-domän.se>'
+mkdir -p ~/.secrets
 echo 're_...' > ~/.secrets/RESEND_KEY && chmod 600 ~/.secrets/RESEND_KEY
 ```
 
-Skickas via `https://api.resend.com/emails`. Fungerar med gratisnivån.
+Mejlet skickas via `https://api.resend.com/emails`. Fungerar med gratisnivån.
 
-### 3. Kanal: mejl via Gmail och app-lösenord
+### Mejla via Gmail
 
-Kräver [**app-lösenord**](https://myaccount.google.com/apppasswords) från Gmail (konto med 2FA):
+Kräver ett [app-lösenord](https://myaccount.google.com/apppasswords) från ett
+Gmail-konto med 2FA.
 
 ```bash
 export LADOK_MAIL_TO=du@example.com
 export LADOK_MAIL_FROM=du@gmail.com
 export LADOK_SMTP_USER=du@gmail.com
+mkdir -p ~/.secrets
 echo 'abcd efgh ijkl mnop' > ~/.secrets/GMAIL_APP_PASSWORD && chmod 600 ~/.secrets/GMAIL_APP_PASSWORD
 export LADOK_SMTP_PASSWORD_FILE=$HOME/.secrets/GMAIL_APP_PASSWORD
 ```
 
 När `LADOK_SMTP_PASSWORD_FILE` är satt används SMTP i stället för Resend.
 
-### 4. Andra kanaler
+### Andra kanaler
 
-| Kanal | Variabler | Not |
+| Kanal | Variabler | Information |
 |---|---|---|
-| Telegram | `LADOK_TELEGRAM_TOKEN`, `LADOK_TELEGRAM_CHAT` | bot + chat id, enklaste push till mobilen |
-| Slack | `LADOK_WEBHOOK_URL`, `LADOK_WEBHOOK_FORMAT=slack` | inkommande webhook, skickar `{"text": ...}` |
-| Discord | `LADOK_WEBHOOK_URL`, `LADOK_WEBHOOK_FORMAT=discord` | skickar `{"content": ...}` |
-| ntfy | `LADOK_WEBHOOK_URL=https://ntfy.sh/<topic>`, `LADOK_WEBHOOK_FORMAT=ntfy` | ingen registrering, bara topic-namnet |
-| Egen webhook | `LADOK_WEBHOOK_URL=...`, `LADOK_WEBHOOK_FORMAT=generic` | `{"text": ..., "source": "ladok-vakt"}` |
-| Valfri kommando | `LADOK_NOTIFY_COMMAND='curl -d @- https://...'` | meddelandet på stdin, sista utvägen |
+| Telegram | `LADOK_TELEGRAM_TOKEN`, `LADOK_TELEGRAM_CHAT` | Bot och chat-id; enkel push till mobilen |
+| Slack | `LADOK_WEBHOOK_URL`, `LADOK_WEBHOOK_FORMAT=slack` | Inkommande webhook; skickar `{"text": ...}` |
+| Discord | `LADOK_WEBHOOK_URL`, `LADOK_WEBHOOK_FORMAT=discord` | Skickar `{"content": ...}` |
+| ntfy | `LADOK_WEBHOOK_URL=https://ntfy.sh/<topic>`, `LADOK_WEBHOOK_FORMAT=ntfy` | Ingen registrering; välj ett topic-namn |
+| Egen webhook | `LADOK_WEBHOOK_URL=...`, `LADOK_WEBHOOK_FORMAT=generic` | Skickar `{"text": ..., "source": "ladok-vakt"}` |
+| Eget kommando | `LADOK_NOTIFY_COMMAND='curl -d @- https://...'` | Meddelandet skickas på stdin; använd som sista utväg |
+
+Prova att notifieringskanalerna svarar:
 
 ```bash
-python3 -m ladok_vakt --test-mail    # bevisar att kanalerna svarar
+python3 -m ladok_vakt --test-mail
 ```
+
+## Valfri automatisk inloggning
+
+Automatisk inloggning är avstängd som standard. Ladok-sessionen kan ta slut när
+webbläsaren startas om eller efter en tids inaktivitet. Med `LADOK_AUTOLOGIN=1`
+försöker skriptet logga in igen innan det larmar, med hjälp av lösenordet Chrome
+redan har sparat för ditt lärosätes inloggningssida.
+
+```bash
+export LADOK_IDP_ENTITY='https://swamid2.shh.se/idp/shibboleth'   # lärosätets SWAMID entityID
+export LADOK_AUTOLOGIN=1
+python3 -m ladok_vakt --login   # prova i förväg
+```
+
+Skriptet öppnar inloggningen via SWAMID, väntar tills Chrome har fyllt i
+formuläret och klickar på Login med ett riktigt musklick. Därefter kontrollerar
+det att Ladok svarar innan inloggningen rapporteras som lyckad.
+
+**Säkerhetsgränser:** skriptet läser aldrig lösenordsfältets värde, sparar inget,
+skriver inget, skickar inget och använder inte webbläsarens lösenordshanterar-API.
+Det kontrollerar bara, har fälten fyllts i?, och klickar. Se koden i
+`ladok_vakt/login.py`; testet i `tests/` larmar om någon lägger till avläsning av
+fältvärden.
+
+För att omloggningen ska fungera måste lösenordet vara sparat i den Chrome-profil
+skriptet använder. Inloggningen får inte kräva 2FA, engångskod eller godkännande i
+en app. Om den gör det misslyckas omloggningen och du får ett fellarm — skriptet
+gissar inte.
 
 ## Konfiguration
 
 | Variabel | Standard | Betydelse |
 |---|---|---|
-| `LADOK_CDP` | `http://127.0.0.1:9233` | Chrome med DevTools, din inloggade session |
-| `LADOK_LAROSATE` | `38` | lärosätets id i Ladok (38 = Sophiahemmet) |
-| `LADOK_MAIL_TO` | tom | mottagare, tom = ingen mejl |
-| `LADOK_MAIL_FROM` | `ladok-vakt <vakt@example.org>` | avsändare, måste vara verifierad i Resend |
-| `LADOK_CLOSE_DAYS` | `3` | larma när fönstret stänger inom så många dagar |
-| `LADOK_AUTOLOGIN` | `0` | `1` = försök logga in igen med sparat lösenord innan larm |
-| `LADOK_IDP_ENTITY` | tom | lärosätets SWAMID entityID, krävs för omloggning |
-| `LADOK_STALE_HOURS` | `36` | larma när ingen lyckad hämtning är äldre än så |
-| `LADOK_MAIL_MIN_HOURS` | `20` | max ett fellarm per kanal och dygn |
-| `LADOK_HEARTBEAT` | `1` | veckohälsokoll på måndagar, `0` stänger av |
-| `LADOK_STATE_DIR` | `~/.local/state/ladok-vakt` | state och logg |
+| `LADOK_CDP` | `http://127.0.0.1:9233` | Chrome DevTools-endpoint för din inloggade session |
+| `LADOK_LAROSATE` | `38` | Lärosätets id i Ladok (38 = Sophiahemmet) |
+| `LADOK_MAIL_TO` | tom | Mottagare; tomt värde stänger av mejl |
+| `LADOK_MAIL_FROM` | `ladok-vakt <vakt@example.org>` | Avsändare; måste vara verifierad hos Resend |
+| `LADOK_CLOSE_DAYS` | `3` | Larma när fönstret stänger inom så många dagar |
+| `LADOK_AUTOLOGIN` | `0` | Sätt till `1` för att försöka logga in igen med sparat lösenord |
+| `LADOK_IDP_ENTITY` | tom | Lärosätets SWAMID entityID; krävs för omloggning |
+| `LADOK_STALE_HOURS` | `36` | Larma när senaste lyckade hämtning är äldre än så här |
+| `LADOK_MAIL_MIN_HOURS` | `20` | Minsta tid mellan fellarm per kanal |
+| `LADOK_HEARTBEAT` | `1` | Veckohälsokoll på måndagar; `0` stänger av |
+| `LADOK_STATE_DIR` | `~/.local/state/ladok-vakt` | Katalog för status och logg |
 
-Status finns i `$LADOK_STATE_DIR/state.json`, historik i `ladok-vakt.log`.
+Status sparas i `$LADOK_STATE_DIR/state.json`, och historik i `ladok-vakt.log`.
 
 ## Så fungerar det
 
-Ladok har inget student-API med token. Studentwebb är en webbapp som hämtar allt
-via `https://student.ladok.se/student/proxy/<lärosäte>/...` med sessionskakan.
-`ladok-vakt` gör samma sak, från en flik på samma origin, via DevTools-protokollet:
+Ladok har inget student-API med token. Studentwebben hämtar data via
+`https://student.ladok.se/student/proxy/<lärosäte>/...` med sessionskakan.
+`ladok-vakt` gör motsvarande anrop från en flik på samma origin via Chrome DevTools-protokollet.
 
 | Data | Endpoint |
 |---|---|
-| inloggad student | `/studiedeltagande/internal/student/inloggad/som` |
-| kurstillfällen + registreringsperiod | `/studiedeltagande/internal/tillfallesdeltagande/kurstillfallesdeltagande/student/<uid>` |
-| tentamensanmälningar | `/resultat/internal/studentweb/aktivitetstillfalle/inloggadstudent/relevanta` |
+| Inloggad student | `/studiedeltagande/internal/student/inloggad/som` |
+| Kurstillfällen och registreringsperiod | `/studiedeltagande/internal/tillfallesdeltagande/kurstillfallesdeltagande/student/<uid>` |
+| Tentamensanmälningar | `/resultat/internal/studentweb/aktivitetstillfalle/inloggadstudent/relevanta` |
 
-Svaren är XML i Ladoks schema. Fälten som används är `sd:Registreringsperiod`
-(`base:Startdatum` / `base:Slutdatum`), `sd:Tillstand` och `sd:UtbildningsPeriodFran/Till`.
+Svaren är XML i Ladoks schema. Skriptet använder bland annat
+`sd:Registreringsperiod` (`base:Startdatum` / `base:Slutdatum`), `sd:Tillstand`
+och `sd:UtbildningsPeriodFran/Till`.
 
 ## Felsökning
 
-- **"ingen Ladok-session"**: sessionen är slut eller Chrome kör utan
-  `--remote-debugging-port=9233`. Öppna `http://127.0.0.1:9233/json/version`, logga
-  in i Ladok i den fliken, kör igen.
-- **Tomt svar men du vet att du har kurser**: kontrollera `LADOK_LAROSATE`. Fel
-  lärosätes-id ger ett tomt, men giltigt, svar.
-- **Ingen mejl men raden skrivs ut**: `LADOK_MAIL_TO` är tom, eller Resend-nyckeln
-  ligger inte på `LADOK_RESEND_KEY_FILE`. Loggen säger vilket.
-- **Resend svarar 403**: Cloudflares skydd framför Resend avvisar vissa
-  user agents. Skriptet skickar en egen, men proxar eller andra verktyg som rör
-  samma nyckel kan behöva samma sak.
+- **"Ingen Ladok-session"**: sessionen har gått ut eller Chrome körs utan
+  `--remote-debugging-port=9233`. Öppna `http://127.0.0.1:9233/json/version`,
+  logga in i Ladok i den fliken och prova igen.
+- **Tomt svar trots att du har kurser**: kontrollera `LADOK_LAROSATE`. Fel
+  lärosätes-id kan ge ett tomt men giltigt svar.
+- **Ingen mejl, men raden skrivs ut**: kontrollera att `LADOK_MAIL_TO` är satt
+  och att Resend-nyckeln finns på `LADOK_RESEND_KEY_FILE`. Loggen anger orsaken.
+- **Resend svarar 403**: Cloudflares skydd framför Resend kan avvisa vissa user
+  agents. Skriptet skickar en egen user agent, men proxar eller andra verktyg som
+  använder samma nyckel kan behöva göra detsamma.
 - **Varför inte Ladoks egen mejlpåminnelse?** Ladok har ingen påminnelse om
-  kursregistrering. Tentamensanmälan kan meddelas av lärosätet, men det är en
-  lokal rutin, inte något du kan lita på terminen du behöver den.
+  kursregistrering. Lärosätet kan meddela om tentamensanmälan, men det är en lokal
+  rutin — inte något du kan lita på den termin du behöver den.
 
 ## Integritet
 
-Ingen data lämnar datorn utom larmet självt. Sessionskakan stannar i din
-Chrome-profil. Skriptet skickar bara kursnamn, datum och en varningstext till den
-kanal du valt. Ingen statistik, ingen telemetri, inget konto.
+Ingen data lämnar datorn utom själva larmet. Sessionskakan stannar i din
+Chrome-profil. Skriptet skickar bara kursnamn, datum och varningstext till den
+kanal du väljer. Ingen statistik, telemetri eller något konto.
 
-**Inloggning:** lösenordet lämnar aldrig webbläsaren. Skriptet läser, sparar,
-skickar och loggar inget av det, och det har inget eget konto: det använder den
-inloggning du själv har sparat i din Chrome-profil. Omloggningen är avstängd som
-standard, och den klickar bara i ett formulär Chrome redan har fyllt i. Slår du på
-den ansvarar du själv för att det är förenligt med ditt lärosätes regler.
-
-## Krav
-
-Python 3.8+, `websockets`, Chrome eller Chromium.
+Lösenordet lämnar aldrig webbläsaren: skriptet läser, sparar, skickar eller loggar
+inte lösenordet. Det använder inloggningen du själv har sparat i Chrome. Automatisk
+om inloggning är avstängd som standard; om du väljer att aktivera den ansvarar du
+själv för att det följer ditt lärosätes regler.
 
 ## Licens
 
 MIT.
+
 ---
 
 <sub>
