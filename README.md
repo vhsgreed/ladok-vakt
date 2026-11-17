@@ -2,35 +2,23 @@
 
 **Få mejl när Ladok-anmälan öppnar, innan fönstret stänger.**
 
-`ladok-vakt` bevakar kursregistrering och tentamensanmälan i Ladok. Det läser
-bara — anmäler aldrig något åt dig — och säger till när det finns något du behöver
-veta. I normal drift är det tyst.
+`ladok-vakt` bevakar kursregistrering och tentamensanmälan i Ladok.
 
-```text
-- Grundläggande farmakologi och omvårdnad (1SFOM2): anmälan 2026-11-23 till 2026-11-30 [om 7 d], kursstart 2026-11-30
-- Människan i hälsa och sjukdom del 1 (2SHS11): anmälan 2027-01-18 till 2027-01-25 [om 63 d], kursstart 2027-01-25
-```
-
-Engelska: [README.en.md](README.en.md).
+English: [README.en.md](README.en.md).
 
 ---
 
 ## Varför ladok-vakt?
 
-Ladok påminner inte om att kursregistreringen öppnar. Fönstret är ofta bara en
-vecka, och informationen finns inne i studentwebben. Missar du det kan du stå utan
-kursplats eller tentamensplats. Kalenderpåminnelser hjälper bara så länge datumen
-inte flyttas eller tillfället läggs upp sent.
+Ladok erbjuder inte epost-notiser i sin studenttjänst, dessa skript kringgår detta.
 
-`ladok-vakt` hämtar anmälningsfönstren direkt från Ladok. Det är byggt för att
-köras automatiskt, exempelvis en gång om dagen via cron, och vara tyst när allt
-fungerar som det ska.
+`ladok-vakt` hämtar datum för anmälning till kurs och examination direkt från [Ladok](https://student.ladok.se/) och påminner användaren via epost eller annan kanal.
 
 ## Snabbstart
 
 ### Förutsättningar
 
-- Python 3.8 eller senare
+- Python 3.8+
 - Chrome eller Chromium
 - Python-paketet `websockets`
 
@@ -53,15 +41,14 @@ python3 -m ladok_vakt --all
 Kör `python3 -m ladok_vakt` utan argument för cron-läget: det skriver bara när
 det finns något att säga. Ställ in en notifieringskanal nedan för att få larm.
 
-## Vad den gör — och inte gör
+## Funktioner
 
 - Hämtar dina kurstillfällen, registreringsperioder och kursperioder.
-- Hämtar tentamensanmälningar där Ladok exponerar dem.
 - Skriver en rad per fönster som är öppet nu eller stänger inom det valda antalet dagar.
-- Larmar vid fel, till exempel om ingen hämtning lyckats på 36 timmar, kurslistan är tom, sessionen har dött eller svaret är trasigt.
-- Skickar en veckohälsokoll på måndagar, så att tystnad går att skilja från att skriptet slutat fungera.
-- Anmäler, avanmäler eller ändrar aldrig något. Skriptet läser bara från Ladok.
-- Skickar ingen daglig sammanfattning. Tystnad är ett feature, inte en bugg.
+- Larmar vid fel, till exempel om ingen hämtning lyckats på 36 timmar, kurslistan är tom, sessionen har dött eller svaret är felaktigt.
+- Skickar en veckohälsokoll på måndagar.
+- Anmäler, avanmäler eller ändrar ej något.
+- Valfri inloggningsfunktion för att behålla en aktiv session över tid
 
 ## Schemalägg körningen
 
@@ -84,65 +71,27 @@ systemctl --user daemon-reload && systemctl --user enable --now ladok-vakt.timer
 
 ### Agent
 
-För Hermes, Claude Code eller annan agent: lägg körningen i agentens cron eller
+lägg körningen i agentens cron eller
 registrera [`skill/SKILL.md`](skill/SKILL.md) som en skill. Skriptet är gjort för
-att kunna köras utan att agenten behöver tolka fritext.
+att kunna köras utan att behöva tolkas som fritext.
 
 ## Välj notifieringskanal
 
-### Mejla via Resend
-
-Det snabbaste sättet att komma igång med mejl utan SMTP-lösenord. Verifiera din
-domän i Resend och skapa en API-nyckel:
-
-```bash
-export LADOK_MAIL_TO=du@example.com
-export LADOK_MAIL_FROM='ladok-vakt <vakt@din-domän.se>'
-mkdir -p ~/.secrets
-echo 're_...' > ~/.secrets/RESEND_KEY && chmod 600 ~/.secrets/RESEND_KEY
-```
-
-Mejlet skickas via `https://api.resend.com/emails`. Fungerar med gratisnivån.
-
-### Mejla via Gmail
-
-Kräver ett [app-lösenord](https://myaccount.google.com/apppasswords) från ett
-Gmail-konto med 2FA.
-
-```bash
-export LADOK_MAIL_TO=du@example.com
-export LADOK_MAIL_FROM=du@gmail.com
-export LADOK_SMTP_USER=du@gmail.com
-mkdir -p ~/.secrets
-echo 'abcd efgh ijkl mnop' > ~/.secrets/GMAIL_APP_PASSWORD && chmod 600 ~/.secrets/GMAIL_APP_PASSWORD
-export LADOK_SMTP_PASSWORD_FILE=$HOME/.secrets/GMAIL_APP_PASSWORD
-```
-
-När `LADOK_SMTP_PASSWORD_FILE` är satt används SMTP i stället för Resend.
-
-### Andra kanaler
-
 | Kanal | Variabler | Information |
 |---|---|---|
-| Telegram | `LADOK_TELEGRAM_TOKEN`, `LADOK_TELEGRAM_CHAT` | Bot och chat-id; enkel push till mobilen |
-| Slack | `LADOK_WEBHOOK_URL`, `LADOK_WEBHOOK_FORMAT=slack` | Inkommande webhook; skickar `{"text": ...}` |
-| Discord | `LADOK_WEBHOOK_URL`, `LADOK_WEBHOOK_FORMAT=discord` | Skickar `{"content": ...}` |
-| ntfy | `LADOK_WEBHOOK_URL=https://ntfy.sh/<topic>`, `LADOK_WEBHOOK_FORMAT=ntfy` | Ingen registrering; välj ett topic-namn |
-| Egen webhook | `LADOK_WEBHOOK_URL=...`, `LADOK_WEBHOOK_FORMAT=generic` | Skickar `{"text": ..., "source": "ladok-vakt"}` |
-| Eget kommando | `LADOK_NOTIFY_COMMAND='curl -d @- https://...'` | Meddelandet skickas på stdin; använd som sista utväg |
-
-Prova att notifieringskanalerna svarar:
-
-```bash
-python3 -m ladok_vakt --test-mail
-```
+| **Resend** (mejl) | `LADOK_MAIL_TO`, `LADOK_MAIL_FROM`, `~/<PATH TO RESEND_KEY>` | Mejlet skickas via `https://api.resend.com/emails`. Fungerar med gratisnivån. |
+| **Gmail** (mejl) | `LADOK_MAIL_TO`, `LADOK_MAIL_FROM`, `LADOK_SMTP_USER`, `LADOK_SMTP_PASSWORD_FILE` | Kräver ett [app-lösenord](https://myaccount.google.com/apppasswords) från ett Gmail-konto med 2FA. Sätt `LADOK_SMTP_PASSWORD_FILE=$<PATH TO GMAIL_APP_PASSWORD>`. När variabeln är satt används SMTP i stället för Resend. |
+| **Telegram** | `LADOK_TELEGRAM_TOKEN`, `LADOK_TELEGRAM_CHAT` | Bot och chat-id; enkel push till mobilen. |
+| **Slack** | `LADOK_WEBHOOK_URL`, `LADOK_WEBHOOK_FORMAT=slack` | Inkommande webhook; skickar `{"text": ...}`. |
+| **Discord** | `LADOK_WEBHOOK_URL`, `LADOK_WEBHOOK_FORMAT=discord` | Skickar `{"content": ...}`. |
+| **ntfy** | `LADOK_WEBHOOK_URL=https://ntfy.sh/<topic>`, `LADOK_WEBHOOK_FORMAT=ntfy` | Ingen registrering; välj ett topic-namn. |
+| **Egen webhook** | `LADOK_WEBHOOK_URL=...`, `LADOK_WEBHOOK_FORMAT=generic` | Skickar `{"text": ..., "source": "ladok-vakt"}`. |
+| **Eget kommando** | `LADOK_NOTIFY_COMMAND='curl -d @- https://...'` | Skickas via stdin |
 
 ## Valfri automatisk inloggning
 
-Automatisk inloggning är avstängd som standard. Ladok-sessionen kan ta slut när
-webbläsaren startas om eller efter en tids inaktivitet. Med `LADOK_AUTOLOGIN=1`
-försöker skriptet logga in igen innan det larmar, med hjälp av lösenordet Chrome
-redan har sparat för ditt lärosätes inloggningssida.
+
+Ladok-sessionen kan ta slut när webbläsaren startas om eller efter en tids inaktivitet.  försöker skriptet logga in igen innan det larmar. Förutsätter att du har inlogg sparat i sessionen som skripten använder. 
 
 ```bash
 export LADOK_IDP_ENTITY='https://swamid2.shh.se/idp/shibboleth'   # lärosätets SWAMID entityID
@@ -199,22 +148,6 @@ Svaren är XML i Ladoks schema. Skriptet använder bland annat
 `sd:Registreringsperiod` (`base:Startdatum` / `base:Slutdatum`), `sd:Tillstand`
 och `sd:UtbildningsPeriodFran/Till`.
 
-## Felsökning
-
-- **"Ingen Ladok-session"**: sessionen har gått ut eller Chrome körs utan
-  `--remote-debugging-port=9233`. Öppna `http://127.0.0.1:9233/json/version`,
-  logga in i Ladok i den fliken och prova igen.
-- **Tomt svar trots att du har kurser**: kontrollera `LADOK_LAROSATE`. Fel
-  lärosätes-id kan ge ett tomt men giltigt svar.
-- **Ingen mejl, men raden skrivs ut**: kontrollera att `LADOK_MAIL_TO` är satt
-  och att Resend-nyckeln finns på `LADOK_RESEND_KEY_FILE`. Loggen anger orsaken.
-- **Resend svarar 403**: Cloudflares skydd framför Resend kan avvisa vissa user
-  agents. Skriptet skickar en egen user agent, men proxar eller andra verktyg som
-  använder samma nyckel kan behöva göra detsamma.
-- **Varför inte Ladoks egen mejlpåminnelse?** Ladok har ingen påminnelse om
-  kursregistrering. Lärosätet kan meddela om tentamensanmälan, men det är en lokal
-  rutin — inte något du kan lita på den termin du behöver den.
-
 ## Integritet
 
 Ingen data lämnar datorn utom själva larmet. Sessionskakan stannar i din
@@ -228,16 +161,11 @@ själv för att det följer ditt lärosätes regler.
 
 ## Licens
 
-MIT.
+MIT
 
 ---
 
 <sub>
-
-**Till Xoms ära**, kaosets gud, som besvarar böner med teleportfällor och
-uppfyller önskningar ingen bad om. Den här vakten skrevs i den andan: en student
-bad om ett larm när anmälan öppnar, och fick ett skript som hellre tiger än
-ljuger. Xom tycker att hela arrangemanget är mycket roligt. Xom är inte klar med dig.
 
 *Xom är intresserad. Peka din agent på repot och se vad som händer.*
 
