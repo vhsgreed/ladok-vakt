@@ -91,7 +91,7 @@ att kunna köras utan att behöva tolkas som fritext.
 ## Valfri automatisk inloggning
 
 
-Ladok-sessionen kan ta slut när webbläsaren startas om eller efter en tids inaktivitet.  försöker skriptet logga in igen innan det larmar. Förutsätter att du har inlogg sparat i sessionen som skripten använder. 
+Ladok-sessionen kan ta slut när webbläsaren startas om eller efter en tids inaktivitet. Med `LADOK_AUTOLOGIN=1` försöker skriptet logga in igen innan det larmar. Förutsätter att du har inlogg sparat i sessionen som skripten använder. 
 
 ```bash
 export LADOK_IDP_ENTITY='https://swamid2.shh.se/idp/shibboleth'   # lärosätets SWAMID entityID
@@ -155,8 +155,7 @@ Chrome-profil. Skriptet skickar bara kursnamn, datum och varningstext till den
 kanal du väljer. Ingen statistik, telemetri eller något konto.
 
 Lösenordet lämnar aldrig webbläsaren: skriptet läser, sparar, skickar eller loggar
-inte lösenordet. Det använder inloggningen du själv har sparat i Chrome. Automatisk
-om inloggning är avstängd som standard; om du väljer att aktivera den ansvarar du
+inte lösenordet. Det använder inloggningen du själv har sparat i Chrome. Automatisk inloggning är avstängd som standard; om du väljer att aktivera den ansvarar du
 själv för att det följer ditt lärosätes regler.
 
 ## Licens
