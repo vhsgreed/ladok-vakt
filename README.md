@@ -64,7 +64,7 @@ finns något att säga.
 
 ## Valfri inloggning (av som standard)
 
-Sessionen i Ladok tar slut, typiskt när webbläsaren startas om eller efter en tids
+Sessionen i Ladok tar slut när webbläsaren startas om eller efter en tids
 inaktivitet. Med `LADOK_AUTOLOGIN=1` försöker skriptet logga in igen innan det larmar,
 med hjälp av det lösenord Chrome redan har sparat för ditt lärosätes inloggningssida.
 
@@ -89,8 +89,6 @@ inloggningen kräver inget mer (2FA, engångskod eller godkännande i app). Gör
 misslyckas omloggningen och du får ett fellarm, vilket är meningen: den ska inte gissa.
 
 ## Integrera i ditt flöde
-
-Tre lager, välj det du redan har. Inget av dem kräver ett konto hos oss.
 
 ### 1. Schemaläggning
 
@@ -126,8 +124,7 @@ Skickas via `https://api.resend.com/emails`. Fungerar med gratisnivån.
 
 ### 3. Kanal: mejl via Gmail och app-lösenord
 
-Ingen tredje part, men Gmail kräver **app-lösenord** (konto med 2FA ger det under
-Google-konto > Säkerhet > App-lösenord):
+Kräver [**app-lösenord**](https://myaccount.google.com/apppasswords) från Gmail (konto med 2FA):
 
 ```bash
 export LADOK_MAIL_TO=du@example.com
@@ -140,8 +137,6 @@ export LADOK_SMTP_PASSWORD_FILE=$HOME/.secrets/GMAIL_APP_PASSWORD
 När `LADOK_SMTP_PASSWORD_FILE` är satt används SMTP i stället för Resend.
 
 ### 4. Andra kanaler
-
-Alla kan sättas samtidigt. Larmet går ut på varje kanal som är konfigurerad.
 
 | Kanal | Variabler | Not |
 |---|---|---|
@@ -189,12 +184,6 @@ via `https://student.ladok.se/student/proxy/<lärosäte>/...` med sessionskakan.
 Svaren är XML i Ladoks schema. Fälten som används är `sd:Registreringsperiod`
 (`base:Startdatum` / `base:Slutdatum`), `sd:Tillstand` och `sd:UtbildningsPeriodFran/Till`.
 
-## Var används Ladok
-
-Ladok används av svenska lärosäten, med ett eget id per skola: byt
-`LADOK_LAROSATE` och samma skript fungerar på din skola. Norge, Danmark och
-Finland använder andra system, så verktyget är svenskt.
-
 ## Felsökning
 
 - **"ingen Ladok-session"**: sessionen är slut eller Chrome kör utan
@@ -225,19 +214,11 @@ den ansvarar du själv för att det är förenligt med ditt lärosätes regler.
 
 ## Krav
 
-Python 3.8+, `websockets`, en Chrome eller Chromium som du kan starta med
-DevTools-port. Linux, macOS och Windows, allt som har Python och Chrome.
+Python 3.8+, `websockets`, Chrome eller Chromium.
 
-## Utveckling
+## Licens
 
-```bash
-python3 -m pytest tests -q     # 8 tester, ingen nätverkstrafik
-```
-
-## License
-
-MIT. Gör vad du vill, ingen garanti.
-
+MIT.
 ---
 
 <sub>
